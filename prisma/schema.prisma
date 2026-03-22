@@ -1,0 +1,121 @@
+// SwordCraft v2 - Game Save Schema
+// Оптимизировано для Turso (libSQL)
+// ~50-100 KB на игрока, вместимость ~90,000+ игроков в 9 GB
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "libsql"
+  url      = env("DATABASE_URL")
+  authToken = env("DATABASE_AUTH_TOKEN")
+}
+
+// ================================
+// ИГРОК И АВТОРИЗАЦИЯ
+// ================================
+
+model PlayerAccount {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  passwordHash String?
+  name         String   @default("Кузнец")
+
+  // OAuth данные (для будущего)
+  googleId  String? @unique
+  discordId String? @unique
+
+  // Метаданные
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLoginAt DateTime?
+
+  // Связи
+  gameSave GameSave?
+
+  @@map("players")
+}
+
+// ================================
+// ОСНОВНОЕ СОХРАНЕНИЕ ИГРЫ
+// ================================
+
+model GameSave {
+  id       String        @id @default(cuid())
+  playerId String        @unique
+  player   PlayerAccount @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // === ДАННЫЕ ИГРОКА ===
+  level      Int @default(1)
+  experience Int @default(0)
+  fame       Int @default(0)
+
+  // === РЕСУРСЫ ===
+  // Храним как JSON для гибкости и скорости
+  resources String @default("{}")
+
+  // === СТАТИСТИКА ===
+  statistics String @default("{}")
+
+  // === РАБОЧИЕ И ЗДАНИЯ ===
+  workers    String @default("[]")
+  buildings  String @default("[]")
+  maxWorkers Int    @default(3)
+
+  // === КРАФТ ===
+  activeCraft          String @default("{}")
+  activeRefining       String @default("{}")
+  weaponInventory      String @default("{\"weapons\":[]}")
+  unlockedRecipes      String @default("{\"weaponRecipes\":[\"sword_iron\",\"dagger_iron\",\"sword_bronze\",\"dagger_bronze\",\"sword_copper\",\"dagger_copper\"],\"refiningRecipes\":[]}")
+  recipeSources        String @default("[]")
+  unlockedEnchantments String @default("[]")
+
+  // === ГИЛЬДИЯ ===
+  guild             String @default("{}")
+  knownAdventurers  String @default("[]")
+
+  // === ОРДЕРА ===
+  orders String @default("{}")
+
+  // === ОБУЧЕНИЕ ===
+  tutorial String @default("{\"isActive\":true,\"currentStep\":0,\"skipped\":false,\"completedSteps\":[]}")
+
+  // === МЕТАДАННЫЕ ===
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  playTime    Int      @default(0)
+  saveVersion Int      @default(2)
+
+  @@map("game_saves")
+}
+
+// ================================
+// ИСТОРИЯ СОХРАНЕНИЙ (для отката)
+// ================================
+
+model SaveHistory {
+  id          String   @id @default(cuid())
+  gameSaveId  String
+  snapshot    String   // Полный JSON снимок состояния
+  createdAt   DateTime @default(now())
+
+  @@index([gameSaveId])
+  @@map("save_history")
+}
+
+// ================================
+// СЕССИИ (для будущей авторизации)
+// ================================
+
+model Session {
+  id        String   @id @default(cuid())
+  playerId  String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([playerId])
+  @@map("sessions")
+}
