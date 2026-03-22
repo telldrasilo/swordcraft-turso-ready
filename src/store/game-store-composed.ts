@@ -296,6 +296,58 @@ export const useGameStore = create<GameStore>()(
       // Orders slice
       ...createOrdersSlice(set as any, get as any, {} as any),
 
+      // Override generateOrder with wrapper that passes player stats
+      generateOrder: () => {
+        const state = get()
+        const playerLevel = state.player.level
+        const playerFame = state.player.fame
+        
+        // Inline order generation logic (to avoid recursion)
+        const activeOrders = state.orders.filter(o => o.status === 'available').length
+        if (activeOrders >= 3) return null
+        
+        // Generate client using the generator from slice
+        const { generateId, generateClientName } = require('@/lib/store-utils/generators')
+        const client = generateClientName()
+        const weaponTypes = ['sword', 'dagger', 'axe', 'mace', 'spear', 'hammer']
+        const materials = ['iron', 'bronze', 'steel', 'silver', 'gold']
+        
+        const weaponType = weaponTypes[Math.floor(Math.random() * weaponTypes.length)]
+        const material = materials[Math.floor(Math.random() * materials.length)]
+        const minQuality = 30 + Math.floor(Math.random() * 30) + playerLevel * 2
+        const goldReward = 50 + Math.floor(Math.random() * 50) + playerLevel * 20
+        const fameReward = 5 + Math.floor(Math.random() * 10) + playerLevel * 2
+        const deadline = Date.now() + (300 + Math.floor(Math.random() * 300)) * 1000
+        
+        const order = {
+          id: generateId(),
+          clientName: client.name,
+          clientTitle: client.title,
+          clientIcon: client.icon,
+          weaponType,
+          material,
+          minQuality,
+          minAttack: minQuality + 10,
+          goldReward,
+          fameReward,
+          deadline,
+          status: 'available' as const,
+          requiredLevel: Math.max(1, playerLevel - 2),
+          requiredFame: Math.max(0, playerFame - 20),
+        }
+        
+        // Check if client already exists
+        if (state.orders.some(o => o.clientName === client.name && o.status === 'available')) {
+          return null
+        }
+        
+        set((s: any) => ({
+          orders: [...s.orders, order]
+        }))
+        
+        return order
+      },
+
       // Tutorial actions (без state - state в AdditionalState)
       nextTutorialStep: () => set((state) => {
         const nextStep = state.tutorial.currentStep + 1
@@ -764,11 +816,7 @@ export const useGameStore = create<GameStore>()(
         return true
       },
 
-      // Orders - delegating to slice
-      generateOrder: () => {
-        const state = get()
-        return state.generateOrder(state.player.level, state.player.fame)
-      },
+      // Orders - delegating to slice (no wrapper needed, slice methods are available directly)
       acceptOrder: (orderId) => get().acceptOrder(orderId),
       completeOrder: (orderId, weaponId) => {
         const state = get()

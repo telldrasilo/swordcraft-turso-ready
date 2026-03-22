@@ -10,7 +10,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // Демо-игрок для разработки (без авторизации)
-// В продакшене заменить на сессионный ID
 const DEMO_PLAYER_ID = 'demo-player'
 
 // ================================
@@ -27,6 +26,7 @@ export async function GET(request: NextRequest) {
     if (!save) {
       // Создаём новое сохранение с начальными данными
       const newSave = await createNewSave(playerId)
+      console.log('[Save API] Created new save for:', playerId)
       return NextResponse.json({
         success: true,
         data: formatSaveData(newSave),
@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    console.log('[Save API] Loaded save for:', playerId)
     return NextResponse.json({
       success: true,
       data: formatSaveData(save),
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
         recipeSources: JSON.stringify(validatedData.recipeSources),
         unlockedEnchantments: JSON.stringify(validatedData.unlockedEnchantments),
         guild: JSON.stringify(validatedData.guild),
-        knownAdventurers: JSON.stringify(validatedData.knownAdventurers),
+        knownAdventurers: JSON.stringify(validatedData.knownAdventurers || []),
         orders: JSON.stringify(validatedData.orders),
         tutorial: JSON.stringify(validatedData.tutorial),
         playTime: validatedData.playTime || 0,
@@ -101,17 +102,14 @@ export async function POST(request: NextRequest) {
         recipeSources: JSON.stringify(validatedData.recipeSources),
         unlockedEnchantments: JSON.stringify(validatedData.unlockedEnchantments),
         guild: JSON.stringify(validatedData.guild),
-        knownAdventurers: JSON.stringify(validatedData.knownAdventurers),
+        knownAdventurers: JSON.stringify(validatedData.knownAdventurers || []),
         orders: JSON.stringify(validatedData.orders),
         tutorial: JSON.stringify(validatedData.tutorial),
         playTime: validatedData.playTime || 0,
       },
     })
 
-    // Сохраняем историю (для возможности отката)
-    await saveHistory(save.id, validatedData)
-
-    console.log(`[Save API] Saved for player ${playerId} at ${save.updatedAt}`)
+    console.log(`[Save API] Saved for player ${playerId}`)
 
     return NextResponse.json({
       success: true,
@@ -268,14 +266,6 @@ async function createNewSave(playerId: string) {
 }
 
 function validateSaveData(data: any) {
-  // Базовая валидация - проверяем обязательные поля
-  const required = ['player', 'resources', 'statistics']
-  for (const field of required) {
-    if (!data[field]) {
-      throw new Error(`Missing required field: ${field}`)
-    }
-  }
-
   return {
     player: {
       level: Math.max(1, Number(data.player?.level) || 1),
@@ -299,41 +289,5 @@ function validateSaveData(data: any) {
     tutorial: data.tutorial || { isActive: true, currentStep: 0 },
     playTime: Math.max(0, Number(data.playTime) || 0),
     saveVersion: Number(data.saveVersion) || 2,
-  }
-}
-
-async function saveHistory(gameSaveId: string, data: any) {
-  try {
-    // Проверяем количество записей в истории
-    const historyCount = await db.saveHistory.count({
-      where: { gameSaveId },
-    })
-
-    // Если больше 10 - удаляем старые
-    if (historyCount >= 10) {
-      const oldest = await db.saveHistory.findMany({
-        where: { gameSaveId },
-        orderBy: { createdAt: 'asc' },
-        take: historyCount - 9,
-        select: { id: true },
-      })
-
-      await db.saveHistory.deleteMany({
-        where: {
-          id: { in: oldest.map((h) => h.id) },
-        },
-      })
-    }
-
-    // Создаём новый снимок
-    await db.saveHistory.create({
-      data: {
-        gameSaveId,
-        snapshot: JSON.stringify(data),
-      },
-    })
-  } catch (error) {
-    // История не критична, просто логируем
-    console.error('[Save API] History save error:', error)
   }
 }

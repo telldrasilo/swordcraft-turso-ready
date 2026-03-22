@@ -1,41 +1,13 @@
 // SwordCraft v2 - Game Save Schema
-// Оптимизировано для Turso (libSQL)
-// ~50-100 KB на игрока, вместимость ~90,000+ игроков в 9 GB
+// Простая схема без авторизации (для MVP)
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "libsql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-  authToken = env("DATABASE_AUTH_TOKEN")
-}
-
-// ================================
-// ИГРОК И АВТОРИЗАЦИЯ
-// ================================
-
-model PlayerAccount {
-  id           String   @id @default(cuid())
-  email        String?  @unique
-  passwordHash String?
-  name         String   @default("Кузнец")
-
-  // OAuth данные (для будущего)
-  googleId  String? @unique
-  discordId String? @unique
-
-  // Метаданные
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  lastLoginAt DateTime?
-
-  // Связи
-  gameSave GameSave?
-
-  @@map("players")
 }
 
 // ================================
@@ -43,9 +15,8 @@ model PlayerAccount {
 // ================================
 
 model GameSave {
-  id       String        @id @default(cuid())
-  playerId String        @unique
-  player   PlayerAccount @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  playerId String @unique
 
   // === ДАННЫЕ ИГРОКА ===
   level      Int @default(1)
@@ -53,7 +24,6 @@ model GameSave {
   fame       Int @default(0)
 
   // === РЕСУРСЫ ===
-  // Храним как JSON для гибкости и скорости
   resources String @default("{}")
 
   // === СТАТИСТИКА ===
@@ -96,26 +66,11 @@ model GameSave {
 // ================================
 
 model SaveHistory {
-  id          String   @id @default(cuid())
-  gameSaveId  String
-  snapshot    String   // Полный JSON снимок состояния
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  gameSaveId String
+  snapshot   String
+  createdAt  DateTime @default(now())
 
   @@index([gameSaveId])
   @@map("save_history")
-}
-
-// ================================
-// СЕССИИ (для будущей авторизации)
-// ================================
-
-model Session {
-  id        String   @id @default(cuid())
-  playerId  String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([playerId])
-  @@map("sessions")
 }

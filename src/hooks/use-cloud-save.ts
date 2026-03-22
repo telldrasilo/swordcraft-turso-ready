@@ -1,5 +1,5 @@
 /**
- * Хук для синхронизации игры с сервером (Turso)
+ * Хук для синхронизации игры с сервером
  * Автоматическое сохранение и загрузка
  */
 
@@ -7,11 +7,8 @@ import { useEffect, useCallback, useRef, useState } from 'react'
 import { useGameStore } from '@/store'
 
 interface UseCloudSaveOptions {
-  /** Интервал автосохранения в миллисекундах (по умолчанию 60 секунд) */
   autoSaveInterval?: number
-  /** Включить автосохранение */
   enableAutoSave?: boolean
-  /** ID игрока (для будущей авторизации) */
   playerId?: string
 }
 
@@ -25,7 +22,7 @@ interface CloudSaveResult {
   reset: () => Promise<boolean>
 }
 
-// Хелпер для получения титула
+// Хелпер для получения титула по уровню
 function getTitleByLevel(level: number): string {
   const titles = [
     { min: 1, max: 4, title: 'Новичок' },
@@ -49,13 +46,11 @@ function getTitleByLevel(level: number): string {
 export function useCloudSave(options: UseCloudSaveOptions = {}): CloudSaveResult {
   const { autoSaveInterval = 60000, enableAutoSave = true, playerId = 'demo-player' } = options
 
-  // Локальные состояния
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Ref для предотвращения повторных вызовов
   const isLoadingRef = useRef(false)
 
   // Сбор данных для сохранения
